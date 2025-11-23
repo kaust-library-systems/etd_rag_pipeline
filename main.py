@@ -1,28 +1,25 @@
 from langchain_ollama import ChatOllama
+from langchain.messages import HumanMessage, AIMessage, SystemMessage
 
 def main():
     print("Hello from etd-rag-pipeline!")
 
-    llm = ChatOllama(
+    model = ChatOllama(
         model="granite4:3b",
         temperature=0,
     )
 
-    message = [
-        (
-            "system",
-            "You are a helpful assistant that translates English to Spanish. Translate the user sentence.",
-        ),
-        (
-            "human",
-            "I love programming."
-        ),
-    ]
+    system_msg = SystemMessage(
+        '''You are a helpful assistent that respond to questions with three
+           exclamation marks.'''
+    )
 
+    human_msg = HumanMessage("What is the capital of France?")
 
-    ai_msg = llm.invoke(message)
-    print(ai_msg.content)
+    answer = model.invoke([system_msg, human_msg])
+    print(answer.content)
 
 
 if __name__ == "__main__":
     main()
+    print("Have a nice day.")
