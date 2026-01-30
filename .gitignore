@@ -1,6 +1,7 @@
 # ETD RAG pipeline
 scratch/*
 *swp
+*_docling
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
