@@ -12,3 +12,8 @@ dependencies = [
     "langchain-ollama>=1.0.0",
     "python-dotenv>=1.2.1",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.14",
+]
