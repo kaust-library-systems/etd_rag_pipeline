@@ -3,7 +3,7 @@ ETD RAG Pipeline
 
 CLI utility for preparing electronic thesis and dissertations for LLM workflow
 
-# Set up
+# Initial Setup
 
 Create the GitHub repository with the GitHub CLI
 
@@ -24,6 +24,7 @@ Initialized project `etd-rag-pipeline`
 garcm0b@KW20207:~/Work/etd_rag_pipeline$
 ```
 
+> _Note_: I'm not sure if we need to initialize the environment.
 Next initialize the virtual environment
 
 ```
@@ -33,3 +34,28 @@ Creating virtual environment at: .venv
 Activate with: source .venv/bin/activate
 garcm0b@KW20207:~/Work/etd_rag_pipeline$
 ```
+
+# Setting Up for Usage
+
+# Using the CLI Tool
+
+ChromaDB offers a CLI tool:
+
+```
+https://docs.trychroma.com/docs/cli/install
+```
+
+# Starting the Server
+
+First start the server with the path to the database as parameter:
+
+```
+garcm0b@KW20207:/data/ETD_rag$ chroma run --path ./etd_rag.db/
+```
+
+And then connect to the server on another window:
+
+```
+garcm0b@KW20207:/data/ETD_rag$ chroma browse "ETD" --local
+```
+
