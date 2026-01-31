@@ -3,6 +3,10 @@ scratch/*
 *swp
 *_docling
 
+# Ignore all files and directories related to the transition from 
+# Milvus to ChromaDB.
+*_milvus
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
