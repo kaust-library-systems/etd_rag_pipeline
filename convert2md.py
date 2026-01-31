@@ -3,10 +3,13 @@
 
 from pathlib import Path
 from os import PathLike
+from uuid import uuid4
+import asyncio
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_ollama import OllamaEmbeddings
 from langchain_milvus import Milvus
+from pymilvus import AsyncMilvusClient
 
 def list_files(input_dir: str | PathLike[str]) -> list[Path]:
     """Return a list of files as Path objects in a directory.
@@ -33,10 +36,16 @@ def main():
     embeddings = OllamaEmbeddings(model="granite4:3b")
 
     # Initialize the vector store.
+    loop = asyncio.get_event_loop()
+
+    async_client = AsyncMilvusClient(
+        uri=str(vector_store_db)
+    )
     vector_store = Milvus(
         embedding_function=embeddings,
-        connection_args={"uri": str(vector_store_db)},
+        connection_args={"uri": uri},
         index_params={"index_type": "FLAT", "metric_type": "L2"},
+        collection_name="ETD",
     )
 
     # List of files to process.
@@ -50,12 +59,16 @@ def main():
         splitter = RecursiveCharacterTextSplitter(
             chunk_size = 1000,
             chunk_overlap = 200,
+            add_start_index = True,
         )
-        chunks = splitter.split_document(docs)
+        chunks = splitter.split_documents(docs)
         
         print(f"Splitted the document into '{len(chunks)}' chunks")
+        print(f"Saving document to vector store.")
+        chunks_id = [str(uuid4()) for _ in range(len(chunks))]
+        ids = vector_store.add_documents(documents=chunks, ids=chunks_id)
 
-        
+            
 
 
 if __name__ == "__main__":
