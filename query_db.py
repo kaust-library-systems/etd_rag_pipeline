@@ -29,9 +29,9 @@ def main():
         n_results=5,
     )
 
-    metadatas = results["metadatas"]
+    metadata = results["metadatas"]
 
-    for mm in metadatas:
+    for mm in metadata:
         print(mm[0]["source"])
 
     print("Have a nice day!")
