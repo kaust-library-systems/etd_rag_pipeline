@@ -45,7 +45,7 @@ def main():
     logger.info("Input directory: %s", input_path)
     logger.info("Vector store: %s", vector_store_db)
 
-    embed_model = "granite4:3b"
+    embed_model = "granite-embedding:30m"
     logger.info("Embeddings model: %s", embed_model)
     embeddings = OllamaEmbeddings(model=embed_model)
 
