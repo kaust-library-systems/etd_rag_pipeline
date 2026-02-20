@@ -35,6 +35,7 @@ Activate with: source .venv/bin/activate
 garcm0b@KW20207:~/Work/etd_rag_pipeline$
 ```
 
+
 # Setting Up for Usage
 
 # Using the CLI Tool
