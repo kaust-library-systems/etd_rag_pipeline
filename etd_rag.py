@@ -6,9 +6,9 @@
 import logging
 from pathlib import Path
 from os import PathLike
-from uuid import uuid4
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_classic.indexes import SQLRecordManager, index
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
@@ -33,7 +33,7 @@ def list_files(input_dir: str | PathLike[str]) -> list[Path]:
 
 def main():
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
@@ -41,9 +41,11 @@ def main():
 
     input_path = Path("/data") / "ETD_rag" / "test"
     vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
+    record_manager_db = Path("/data") / "ETD_rag" / "record_manager.db"
 
     logger.info("Input directory: %s", input_path)
     logger.info("Vector store: %s", vector_store_db)
+    logger.info("Record manager: %s", record_manager_db)
 
     embed_model = "granite-embedding:30m"
     logger.info("Embeddings model: %s", embed_model)
@@ -55,6 +57,13 @@ def main():
         embedding_function=embeddings,
         persist_directory=str(vector_store_db),
     )
+
+    # Initialize the record manager.
+    record_manager = SQLRecordManager(
+        namespace="ETD",
+        db_url=f"sqlite:///{record_manager_db}",
+    )
+    record_manager.create_schema()
 
     # List of files to process.
     input_file_list = list_files(input_path)
@@ -72,11 +81,35 @@ def main():
         )
         chunks = splitter.split_documents(docs)
 
+        # Keep only essential metadata to ensure consistent hashing
+        for chunk in chunks:
+            chunk.metadata = {
+                "source": chunk.metadata.get("source"),
+                "page": chunk.metadata.get("page"),
+            }
+
         logger.info("Split document into %d chunks", len(chunks))
-        logger.info("Saving document to vector store")
-        chunks_id = [str(uuid4()) for _ in range(len(chunks))]
-        vector_store.add_documents(documents=chunks, ids=chunks_id)
-        logger.info("Document saved to vector store")
+
+        # Debug: show metadata of first chunk
+        if chunks:
+            logger.debug("First chunk metadata: %s", chunks[0].metadata)
+            logger.debug("First chunk content (100 chars): %s", chunks[0].page_content[:100])
+
+        logger.info("Indexing document to vector store")
+        result = index(
+            chunks,
+            record_manager,
+            vector_store,
+            cleanup="incremental",
+            source_id_key="source",
+            key_encoder="blake2b",
+        )
+        logger.info(
+            "Indexing complete: added=%d, skipped=%d, deleted=%d",
+            result["num_added"],
+            result["num_skipped"],
+            result["num_deleted"],
+        )
 
     logger.info("Pipeline completed")
 
