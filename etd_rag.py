@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from os import PathLike
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_classic.indexes import SQLRecordManager, index
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
@@ -72,7 +72,7 @@ def main():
     for file in input_file_list:
         logger.info("Processing file: %s", file.name)
 
-        loader = PyPDFLoader(file)
+        loader = PyMuPDFLoader(file)
         docs = loader.load()
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
