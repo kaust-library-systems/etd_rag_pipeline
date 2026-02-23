@@ -66,19 +66,19 @@ def main():
         embedding_function=embeddings,
     )
 
-    retriever = vector_store.as_retriever()
-    docs = retriever.invoke(question_user)
+    retriever = vector_store.as_retriever(search_kwargs={"k": 2})
+    docs = retriever.invoke(question_user )
+
+    prompt = ChatPromptTemplate.from_template("""Answer the question based on the following context: {context}
+
+    Question: {question}
+    """)
 
     llm = ChatOllama(
         model="granite3.1-dense:8b",
         temperature=0,
         validate_model_on_init=True,
     )
-
-    prompt = ChatPromptTemplate.from_template("""Answer the question based on the following context: {context}
-
-    Question: {question}
-    """)
 
     chain = prompt | llm
     answer = chain.invoke(

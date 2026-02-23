@@ -59,7 +59,7 @@ def main():
     embeddings = OllamaEmbeddings(model=embed_model)
 
     query_text = (
-        "Which of the documents are about non-disjunction events during meiosis"
+        "Which document investigates first-order mean-field game?"
     )
     query_embeddings = embeddings.embed_query(query_text)
 
