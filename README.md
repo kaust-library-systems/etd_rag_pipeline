@@ -38,7 +38,11 @@ garcm0b@KW20207:~/Work/etd_rag_pipeline$
 
 # Setting Up for Usage
 
-# Using the CLI Tool
+# ChromaDB
+
+Using [ChromaDB](https://www.trychroma.com/home).
+
+## Using the CLI Tool
 
 ChromaDB offers a CLI tool:
 
@@ -46,7 +50,7 @@ ChromaDB offers a CLI tool:
 https://docs.trychroma.com/docs/cli/install
 ```
 
-# Starting the Server
+## Starting the Server
 
 First start the server with the path to the database as parameter:
 
