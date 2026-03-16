@@ -5,7 +5,7 @@ import csv
 from pathlib import Path
 from os import PathLike
 from langchain_ollama import OllamaEmbeddings
-import chromadb
+from langchain_chroma import Chroma
 
 
 def get_file_metadata(
@@ -35,6 +35,7 @@ def get_file_metadata(
 
     return None
 
+
 def get_source_info(filename: str) -> dict | None:
     """Look up source information for a file in the CSV.
     Args: filename: The filename to search for in the 'File' column.
@@ -49,33 +50,29 @@ def get_source_info(filename: str) -> dict | None:
 def main():
     vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
 
-    client = chromadb.PersistentClient(str(vector_store_db))
-
-    collection = client.get_collection("ETD")
-
-    print(f"The collection '{collection.name}' has {collection.count()} records.")
-
     embed_model = "granite-embedding:30m"
     embeddings = OllamaEmbeddings(model=embed_model)
 
-    query_text = (
-        "Which document investigates first-order mean-field game?"
+    # Initialize the vector store.
+    vector_store = Chroma(
+        collection_name="ETD",
+        embedding_function=embeddings,
+        persist_directory=str(vector_store_db),
     )
+
+    query_text = "Which document investigates first-order mean-field game?"
     query_embeddings = embeddings.embed_query(query_text)
 
-    results = collection.query(
-        query_embeddings=query_embeddings,
-        include=["metadatas"],
-        n_results=5,
-    )
+    results = vector_store.similarity_search_by_vector(query_embeddings)
 
-    metadata = results["metadatas"]
+    source = results[0].metadata['source']
 
-    for mm in metadata:
-        source_path = Path(mm[0]["source"])
+    source_path = Path(source)
+    #print(f"mg: results metadata source: {results[rr].metadata['source']}")
+    #print(f"mg: results page content: {results[rr].page_content[:30]}")
 
     source_info = get_source_info(source_path.name)
-    print(f"Title: {source_info['Title']}")
+    print(f"{source_path}, {source_info['Author']}, {source_info['Title']}")
     print("Have a nice day!")
 
 
