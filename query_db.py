@@ -6,7 +6,14 @@ from pathlib import Path
 from os import PathLike
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
+from langchain_core.documents import Document
 
+
+def get_files(results: list[Document]) -> list[str]:
+    """Return different files in the results from query in the vector store"""
+
+    sources = [result.metadata['source'] for result in results]
+    return list(dict.fromkeys(sources))
 
 def get_file_metadata(
     filename: str,
@@ -60,19 +67,22 @@ def main():
         persist_directory=str(vector_store_db),
     )
 
-    query_text = "Which document investigates first-order mean-field game?"
+    query_text = "Which document investigates red sea?"
     query_embeddings = embeddings.embed_query(query_text)
 
-    results = vector_store.similarity_search_by_vector(query_embeddings)
+    results = vector_store.similarity_search_by_vector(query_embeddings, k=10)
 
-    source = results[0].metadata['source']
+    print(f"Number of results: {len(results)}")
 
-    source_path = Path(source)
-    #print(f"mg: results metadata source: {results[rr].metadata['source']}")
-    #print(f"mg: results page content: {results[rr].page_content[:30]}")
+    sources = get_files(results)
 
-    source_info = get_source_info(source_path.name)
-    print(f"{source_path}, {source_info['Author']}, {source_info['Title']}")
+    for source in sources:
+        source_path = Path(source)
+        #print(f"mg: results metadata source: {results[rr].metadata['source']}")
+        #print(f"mg: results page content: {results[rr].page_content[:30]}")
+
+        source_info = get_source_info(source_path.name)
+        print(f"{source_path}, {source_info['Author']}, {source_info['Title']}")
     print("Have a nice day!")
 
 
