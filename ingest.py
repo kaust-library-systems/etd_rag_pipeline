@@ -13,8 +13,6 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
 logger = logging.getLogger(__name__)
-
-
 def list_files(input_dir: str | PathLike[str]) -> list[Path]:
     """Return a list of files as Path objects in a directory.
 
@@ -33,7 +31,7 @@ def list_files(input_dir: str | PathLike[str]) -> list[Path]:
 
 def main():
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
