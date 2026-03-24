@@ -70,11 +70,22 @@ def main():
     query_text = "Which document investigates red sea?"
     query_embeddings = embeddings.embed_query(query_text)
 
-    results = vector_store.similarity_search_by_vector(query_embeddings, k=10)
+    # Using large `k` and `fetch_k` so we can deduplicate the entries. There 
+    # are many chunck per document.
+    # Using MMR 
+    results = vector_store.max_marginal_relevance_search_by_vector(query_embeddings, k=40, fetch_k=150)
 
+    # Deduplication.
     print(f"Number of results: {len(results)}")
 
     sources = get_files(results)
+    seen = set()
+    unique_results = []
+    for result in results:
+        source = result.metadata['source']
+        if source not in seen:
+            seen.add(source)
+            unique_results.append(result)
 
     for source in sources:
         source_path = Path(source)
