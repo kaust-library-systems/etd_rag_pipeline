@@ -73,7 +73,7 @@ def main():
     # Using large `k` and `fetch_k` so we can deduplicate the entries. There 
     # are many chunck per document.
     # Using MMR 
-    results = vector_store.max_marginal_relevance_search_by_vector(query_embeddings, k=40, fetch_k=150)
+    results = vector_store.max_marginal_relevance_search_by_vector(query_embeddings, k=50, fetch_k=170)
 
     # Deduplication.
     print(f"Number of results: {len(results)}")
