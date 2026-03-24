@@ -2,6 +2,7 @@
 scratch/*
 *swp
 *_docling
+*txt
 
 # Ignore all files and directories related to the transition from 
 # Milvus to ChromaDB.
