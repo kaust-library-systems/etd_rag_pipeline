@@ -50,6 +50,15 @@ ChromaDB offers a CLI tool:
 https://docs.trychroma.com/docs/cli/install
 ```
 
+## Docker
+
+Downloading the image:
+
+```
+docker pull chromadb/chroma:1.5.7
+```
+
+
 ## Starting the Server
 
 First start the server with the path to the database as parameter:
