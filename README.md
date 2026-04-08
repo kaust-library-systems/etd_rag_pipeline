@@ -58,8 +58,19 @@ Downloading the image:
 docker pull chromadb/chroma:1.5.7
 ```
 
+Starting the Docker server:
 
-## Starting the Server
+```
+docker run -v /data/ETD_rag/etd_rag.db:/data -p 8000:8000 chromadb/chroma:1.5.7
+```
+
+Accessing the collection from a client:
+
+```
+chroma browse "ETD" --host http://localhost:8000
+```
+
+## Starting Local Server
 
 First start the server with the path to the database as parameter:
 
