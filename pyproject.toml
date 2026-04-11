@@ -14,6 +14,7 @@ dependencies = [
     "langchain-text-splitters>=1.1.0",
     "pymupdf>=1.27.1",
     "python-dotenv>=1.2.1",
+    "typer>=0.21.1",
 ]
 
 [dependency-groups]

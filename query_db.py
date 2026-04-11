@@ -2,6 +2,7 @@
 # Marcelo Garcia
 
 import csv
+import typer
 from pathlib import Path
 from os import PathLike
 from langchain_ollama import OllamaEmbeddings
@@ -54,7 +55,7 @@ def get_source_info(filename: str) -> dict | None:
     return info
 
 
-def main():
+def main(query: str, k: int = 50, fetch_k: int = 170):
     vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
 
     embed_model = "granite-embedding:30m"
@@ -67,13 +68,12 @@ def main():
         persist_directory=str(vector_store_db),
     )
 
-    query_text = "Which document investigates red sea?"
-    query_embeddings = embeddings.embed_query(query_text)
+    query_embeddings = embeddings.embed_query(query)
 
     # Using large `k` and `fetch_k` so we can deduplicate the entries. There 
     # are many chunck per document.
     # Using MMR 
-    results = vector_store.max_marginal_relevance_search_by_vector(query_embeddings, k=50, fetch_k=170)
+    results = vector_store.max_marginal_relevance_search_by_vector(query_embeddings, k=k, fetch_k=fetch_k)
 
     # Deduplication.
     print(f"Number of results: {len(results)}")
@@ -98,4 +98,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)
