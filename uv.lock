@@ -419,6 +419,7 @@ dependencies = [
     { name = "langchain-text-splitters" },
     { name = "pymupdf" },
     { name = "python-dotenv" },
+    { name = "requests" },
     { name = "typer" },
 ]
 
@@ -438,6 +439,7 @@ requires-dist = [
     { name = "langchain-text-splitters", specifier = ">=1.1.0" },
     { name = "pymupdf", specifier = ">=1.27.1" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "requests", specifier = ">=2.32.5" },
     { name = "typer", specifier = ">=0.21.1" },
 ]
 
