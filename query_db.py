@@ -3,12 +3,24 @@
 
 import csv
 import typer
+import requests
 from pathlib import Path
 from os import PathLike
+from urllib.parse import urlparse
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
+REPOSITORY_API_URL = "https://repository.kaust.edu.sa/server/api/"
+
+def get_handler(handle_url: str) -> str:
+    """
+    Return the just the handler from the handle url
+    Input: http://hdl.handle.net/10754/224071 
+    Return: 10754/224071
+    """
+
+    return urlparse(handle_url).path[1:]
 
 def get_files(results: list[Document]) -> list[str]:
     """Return different files in the results from query in the vector store"""
@@ -54,6 +66,25 @@ def get_source_info(filename: str) -> dict | None:
 
     return info
 
+def get_item_metadata(handle: str) -> dict:
+    """
+    Fetch public metadata for a DSpace item by handle.
+    Args:
+    handle: DSpace handle, e.g. '10754/625510'
+
+    Returns:
+    Parsed item metadata as a dictionary.
+    """
+    response = requests.get(
+        f"{REPOSITORY_API_URL}pid/find",
+        params={"id": handle},
+        headers={"Accept": "application/json"},
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    return response.json()
+
 
 def main(query: str, k: int = 50, fetch_k: int = 170):
     vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
@@ -93,7 +124,10 @@ def main(query: str, k: int = 50, fetch_k: int = 170):
         #print(f"mg: results page content: {results[rr].page_content[:30]}")
 
         source_info = get_source_info(source_path.name)
-        print(f"{source_path}, {source_info['Author']}, {source_info['Title']}")
+        handler = get_handler(source_info['Handle'])
+        item = get_item_metadata(handler)
+        abstract = item["metadata"]["dc.description.abstract"][0]["value"]
+        print(f"{source_path}, {source_info['Author']}, {source_info['Title']}, {abstract}")
     print("Have a nice day!")
 
 
