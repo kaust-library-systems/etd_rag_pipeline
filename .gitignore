@@ -3,6 +3,7 @@ scratch/*
 *swp
 *_docling
 *txt
+results.csv
 
 # Ignore all files and directories related to the transition from 
 # Milvus to ChromaDB.

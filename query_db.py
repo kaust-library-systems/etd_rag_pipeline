@@ -86,7 +86,21 @@ def get_item_metadata(handle: str) -> dict:
     return response.json()
 
 
-def main(query: str, k: int = 50, fetch_k: int = 170):
+def save_results_csv(
+    results: list[dict],
+    output_file: str | PathLike[str] = "results.csv",
+    ) -> None:
+
+    fieldnames = ["source", "author", "title", "abstract"]
+    output_path = Path(output_file)
+
+    with open(output_path, mode='w', encoding='utf-8', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+
+
+def main(query: str, k: int = 50, fetch_k: int = 170, output: str = "results.csv"):
     vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
 
     embed_model = "granite-embedding:30m"
@@ -118,6 +132,7 @@ def main(query: str, k: int = 50, fetch_k: int = 170):
             seen.add(source)
             unique_results.append(result)
 
+    rows = []
     for source in sources:
         source_path = Path(source)
         #print(f"mg: results metadata source: {results[rr].metadata['source']}")
@@ -126,8 +141,18 @@ def main(query: str, k: int = 50, fetch_k: int = 170):
         source_info = get_source_info(source_path.name)
         handler = get_handler(source_info['Handle'])
         item = get_item_metadata(handler)
-        abstract = item["metadata"]["dc.description.abstract"][0]["value"]
-        print(f"{source_path}, {source_info['Author']}, {source_info['Title']}, {abstract}")
+        abstract_raw = item["metadata"]["dc.description.abstract"][0]["value"]
+        abstract = abstract_raw.replace('\n',' ')
+        #print(f"{source_path}, {source_info['Author']}, {source_info['Title']}")
+        print(f"Saving {source_path} to csv file")
+        rows.append({
+            "source": str(source_path),
+            "author": source_info['Author'],
+            "title": source_info['Title'],
+            "abstract": abstract,
+        })
+
+        save_results_csv(rows, output)
     print("Have a nice day!")
 
 
