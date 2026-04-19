@@ -1,60 +1,23 @@
 # Test querying the database.
 # Marcelo Garcia
 
-import csv
 import typer
+import csv
 import requests
 from pathlib import Path
 from os import PathLike
-from urllib.parse import urlparse
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from utils import get_handler, get_file_metadata
 
 REPOSITORY_API_URL = "https://repository.kaust.edu.sa/server/api/"
-
-def get_handler(handle_url: str) -> str:
-    """
-    Return the just the handler from the handle url
-    Input: http://hdl.handle.net/10754/224071 
-    Return: 10754/224071
-    """
-
-    return urlparse(handle_url).path[1:]
 
 def get_files(results: list[Document]) -> list[str]:
     """Return different files in the results from query in the vector store"""
 
     sources = [result.metadata['source'] for result in results]
     return list(dict.fromkeys(sources))
-
-def get_file_metadata(
-    filename: str,
-    metadata_file: str | PathLike[str] = "metadata.csv",
-) -> dict | None:
-    """Look up metadata for a file in the CSV.
-
-    Args:
-        filename: The filename to search for in the 'File' column.
-        metadata_file: Path to the CSV file.
-
-    Returns:
-        Dictionary with the file's metadata, or None if not found.
-    """
-    metadata_path = Path(metadata_file)
-
-    if not metadata_path.exists():
-        raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
-
-    with open(metadata_path, encoding="utf-8", newline="") as csvfile:
-        reader = csv.DictReader(csvfile)
-
-        for row in reader:
-            if row["File"] == filename:
-                return dict(row)
-
-    return None
-
 
 def get_source_info(filename: str) -> dict | None:
     """Look up source information for a file in the CSV.
@@ -84,7 +47,6 @@ def get_item_metadata(handle: str) -> dict:
     response.raise_for_status()
 
     return response.json()
-
 
 def save_results_csv(
     results: list[dict],
@@ -124,13 +86,6 @@ def main(query: str, k: int = 50, fetch_k: int = 170, output: str = "results.csv
     print(f"Number of results: {len(results)}")
 
     sources = get_files(results)
-    seen = set()
-    unique_results = []
-    for result in results:
-        source = result.metadata['source']
-        if source not in seen:
-            seen.add(source)
-            unique_results.append(result)
 
     rows = []
     for source in sources:
@@ -152,7 +107,7 @@ def main(query: str, k: int = 50, fetch_k: int = 170, output: str = "results.csv
             "abstract": abstract,
         })
 
-        save_results_csv(rows, output)
+    save_results_csv(rows, output)
     print("Have a nice day!")
 
 
