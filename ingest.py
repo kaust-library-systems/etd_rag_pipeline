@@ -3,6 +3,7 @@
 # Marcelo Garcia (marcelo.garcia@kaust.edu.sa)
 #
 
+import re
 import logging
 from pathlib import Path
 from os import PathLike
@@ -29,6 +30,13 @@ def list_files(input_dir: str | PathLike[str]) -> list[Path]:
 
     return [item for item in input_resolve.iterdir() if item.is_file()]
 
+def is_arabic_heavy(text: str, threshold: float = 0.3) -> bool:
+    """Return True if more than `threshold` fraction of characters are Arabic."""
+    arabic_chars = len(re.findall(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]', text))
+    total_chars = len(text.strip())
+    if total_chars == 0:
+        return False
+    return (arabic_chars / total_chars) > threshold
 
 def main():
     logging.basicConfig(
@@ -39,8 +47,8 @@ def main():
     logger.info("Starting ETD RAG ingestion pipeline")
 
     input_path = Path("/data") / "ETD_rag" / "markdown"
-    vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
-    record_manager_db = Path("/data") / "ETD_rag" / "record_manager.db"
+    vector_store_db = Path("/data") / "ETD_rag" / "md_db" / "etd_rag.db"
+    record_manager_db = Path("/data") / "ETD_rag" / "md_db" / "record_manager.db"
 
     logger.info("Input directory: %s", input_path)
     logger.info("Vector store: %s", vector_store_db)
@@ -91,7 +99,8 @@ def main():
             chunk_overlap=300,
         )
         chunks = char_splitter.split_documents(header_chunks)
-
+        chunks = [c for c in chunks if not is_arabic_heavy(c.page_content)]
+        logger.info("Chunks after Arabic filter: %d", len(chunks))
 
         # Keep only essential metadata to ensure consistent hashing
         # Also, adding metadata from the file to the chunk.

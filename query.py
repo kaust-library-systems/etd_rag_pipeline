@@ -63,7 +63,7 @@ def save_results_csv(
 
 
 def main(query: str, k: int = 50, fetch_k: int = 170, output: str = "results.csv"):
-    vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
+    vector_store_db = Path("/data") / "ETD_rag" / "md_db" / "etd_rag.db"
 
     embed_model = "granite-embedding:30m"
     embeddings = OllamaEmbeddings(model=embed_model)
