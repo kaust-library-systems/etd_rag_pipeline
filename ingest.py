@@ -13,6 +13,7 @@ from langchain_classic.indexes import SQLRecordManager, index
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 from utils import get_file_metadata
+from configparser import ConfigParser
 
 logger = logging.getLogger(__name__)
 def list_files(input_dir: str | PathLike[str]) -> list[Path]:
@@ -45,29 +46,50 @@ def main():
     )
 
     logger.info("Starting ETD RAG ingestion pipeline")
+    
+    # Read the config file
+    config = ConfigParser()
+    config.read(Path(__file__).parent / "config.ini")
 
-    input_path = Path("/data") / "ETD_rag" / "markdown"
-    vector_store_db = Path("/data") / "ETD_rag" / "md_db" / "etd_rag.db"
-    record_manager_db = Path("/data") / "ETD_rag" / "md_db" / "record_manager.db"
+    #input_path = Path("/data") / "ETD_rag" / "markdown"
+    #vector_store_db = Path("/data") / "ETD_rag" / "md_db" / "etd_rag.db"
+    #record_manager_db = Path("/data") / "ETD_rag" / "md_db" / "record_manager.db"
+
+    input_path = Path(config["paths"]["input_dir"])
+    metadata_path = Path(config["paths"]["metadata"])
+    record_manager_db = config["paths"]["record_manager"]
+    embed_model = config["embeddings"]["model"]
 
     logger.info("Input directory: %s", input_path)
-    logger.info("Vector store: %s", vector_store_db)
     logger.info("Record manager: %s", record_manager_db)
 
-    embed_model = "granite-embedding:30m"
     logger.info("Embeddings model: %s", embed_model)
     embeddings = OllamaEmbeddings(model=embed_model)
 
     # Initialize the vector store.
+    collection = config["chromadb"]["collection"]
+    host = config["chromadb"]["host"]
+    port = int(config["chromadb"]["port"])
+
+    # Initialize the vector store.
     vector_store = Chroma(
-        collection_name="ETD",
+        collection_name=collection,
         embedding_function=embeddings,
-        persist_directory=str(vector_store_db),
+        host=host,
+        port=port,
     )
+    logger.info("Vector store host: %s", host)
+    logger.info("Vector store port: %s", port)
+
+    #vector_store = Chroma(
+    #    collection_name="ETD",
+    #    embedding_function=embeddings,
+    #    persist_directory=str(vector_store_db),
+    #)
 
     # Initialize the record manager.
     record_manager = SQLRecordManager(
-        namespace="ETD",
+        namespace=config["chromadb"]["collection"],
         db_url=f"sqlite:///{record_manager_db}",
     )
     record_manager.create_schema()
@@ -99,12 +121,12 @@ def main():
             chunk_overlap=300,
         )
         chunks = char_splitter.split_documents(header_chunks)
+        logger.info("Chunks before Arabic filter: %d", len(chunks))
         chunks = [c for c in chunks if not is_arabic_heavy(c.page_content)]
         logger.info("Chunks after Arabic filter: %d", len(chunks))
 
         # Keep only essential metadata to ensure consistent hashing
         # Also, adding metadata from the file to the chunk.
-        metadata_path = Path("/data") / "ETD_rag" / "metadata.csv"
         source_info = get_file_metadata(file.stem + ".pdf", metadata_path) 
         for chunk in chunks:
             chunk.metadata = {
