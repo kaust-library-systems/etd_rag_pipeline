@@ -46,7 +46,7 @@ def main():
     )
 
     logger.info("Starting ETD RAG ingestion pipeline")
-    
+
     # Read the config file
     config = ConfigParser()
     config.read(Path(__file__).parent / "config.ini")
@@ -101,64 +101,68 @@ def main():
     for file in input_file_list:
         logger.info("Processing file: %s", file.name)
 
-        loader = TextLoader(file, encoding='utf-8')
-        docs = loader.load()
-    
-        # First split by headers to respect document structure
-        md_splitter = MarkdownHeaderTextSplitter(
-            headers_to_split_on = [
-                ('#', 'h1'),
-                ('##', 'section'),
-                ('###', 'subsection'),
-            ],
-            strip_headers=False,
-        )
-        header_chunks = md_splitter.split_text(docs[0].page_content)
+        try:
 
-        # Then split oversized sections (e.g. long chapters) by character
-        char_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,
-            chunk_overlap=300,
-        )
-        chunks = char_splitter.split_documents(header_chunks)
-        logger.info("Chunks before Arabic filter: %d", len(chunks))
-        chunks = [c for c in chunks if not is_arabic_heavy(c.page_content)]
-        logger.info("Chunks after Arabic filter: %d", len(chunks))
+            loader = TextLoader(file, encoding='utf-8')
+            docs = loader.load()
 
-        # Keep only essential metadata to ensure consistent hashing
-        # Also, adding metadata from the file to the chunk.
-        source_info = get_file_metadata(file.stem + ".pdf", metadata_path) 
-        for chunk in chunks:
-            chunk.metadata = {
-                "source": str(file),
-                "section": chunk.metadata.get("section"),
-                "title": source_info.get("Title") if source_info else None,
-                "author": source_info.get("Author") if source_info else None,
-                "handle": source_info.get("Handle") if source_info else None,
-            }
+            # First split by headers to respect document structure
+            md_splitter = MarkdownHeaderTextSplitter(
+                headers_to_split_on = [
+                    ('#', 'h1'),
+                    ('##', 'section'),
+                    ('###', 'subsection'),
+                ],
+                strip_headers=False,
+            )
+            header_chunks = md_splitter.split_text(docs[0].page_content)
 
-        logger.info("Split document into %d chunks", len(chunks))
+            # Then split oversized sections (e.g. long chapters) by character
+            char_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=800,
+                chunk_overlap=150,
+            )
+            chunks = char_splitter.split_documents(header_chunks)
+            logger.info("Chunks before Arabic filter: %d", len(chunks))
+            chunks = [c for c in chunks if not is_arabic_heavy(c.page_content)]
+            logger.info("Chunks after Arabic filter: %d", len(chunks))
 
-        # Debug: show metadata of first chunk
-        if chunks:
-            logger.debug("First chunk metadata: %s", chunks[0].metadata)
-            logger.debug("First chunk content (100 chars): %s", chunks[0].page_content[:100])
+            # Keep only essential metadata to ensure consistent hashing
+            # Also, adding metadata from the file to the chunk.
+            source_info = get_file_metadata(file.stem + ".pdf", metadata_path)
+            for chunk in chunks:
+                chunk.metadata = {
+                    "source": str(file),
+                    "section": chunk.metadata.get("section"),
+                    "title": source_info.get("Title") if source_info else None,
+                    "author": source_info.get("Author") if source_info else None,
+                    "handle": source_info.get("Handle") if source_info else None,
+                }
 
-        logger.info("Indexing document to vector store")
-        result = index(
-            chunks,
-            record_manager,
-            vector_store,
-            cleanup="incremental",
-            source_id_key="source",
-            key_encoder="blake2b",
-        )
-        logger.info(
-            "Indexing complete: added=%d, skipped=%d, deleted=%d",
-            result["num_added"],
-            result["num_skipped"],
-            result["num_deleted"],
-        )
+            logger.info("Split document into %d chunks", len(chunks))
+
+            # Debug: show metadata of first chunk
+            if chunks:
+                logger.debug("First chunk metadata: %s", chunks[0].metadata)
+                logger.debug("First chunk content (100 chars): %s", chunks[0].page_content[:100])
+
+            logger.info("Indexing document to vector store")
+            result = index(
+                chunks,
+                record_manager,
+                vector_store,
+                cleanup="incremental",
+                source_id_key="source",
+                key_encoder="blake2b",
+            )
+            logger.info(
+                "Indexing complete: added=%d, skipped=%d, deleted=%d",
+                result["num_added"],
+                result["num_skipped"],
+                result["num_deleted"],
+            )
+        except Exception as ee:
+            logger.error(f"Failed to process file {file.name}: {ee}")
 
     logger.info("Pipeline completed")
 
