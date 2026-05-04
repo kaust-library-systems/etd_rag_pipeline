@@ -1,12 +1,15 @@
 import csv
 import io
+from configparser import ConfigParser
+from pathlib import Path
+
 import requests
 import streamlit as st
-from pathlib import Path
-from configparser import ConfigParser
-from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
-from utils import get_handler, get_file_metadata
+from langchain_ollama import OllamaEmbeddings
+
+from query import search
+from utils import get_handler
 
 REPOSITORY_API_URL = "https://repository.kaust.edu.sa/server/api/"
 
@@ -55,42 +58,7 @@ def fetch_abstract(handle_url: str) -> str:
 def run_search(query: str) -> list[dict]:
     embeddings, vector_store = load_resources()
 
-    k = int(config["query"]["k"])
-    fetch_k = int(config["query"]["fetch_k"])
-    metadata_path = config["paths"]["metadata"]
-
-    query_embedding = embeddings.embed_query(query)
-    results = vector_store.max_marginal_relevance_search_by_vector(
-        query_embedding, k=k, fetch_k=fetch_k
-    )
-
-    # Deduplicate by source, keep first matching chunk per document
-    seen = {}
-    for doc in results:
-        source = doc.metadata["source"]
-        if source not in seen:
-            seen[source] = doc
-
-    items = []
-    for source, doc in seen.items():
-        source_path = Path(source)
-        info = get_file_metadata(source_path.stem + ".pdf", metadata_path)
-        if not info:
-            continue
-
-        handle_url = info.get("Handle", "")
-        abstract = fetch_abstract(handle_url)
-
-        items.append({
-            "handle": handle_url,
-            "title": info.get("Title", ""),
-            "author": info.get("Author", ""),
-            "type": info.get("Type", ""),
-            "section": doc.metadata.get("section", ""),
-            "abstract": abstract,
-        })
-
-    return items
+    return search(query, embeddings, vector_store, config)
 
 
 def results_to_csv(results: list[dict]) -> str:

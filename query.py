@@ -1,24 +1,28 @@
 # Test querying the database.
 # Marcelo Garcia
 
-import typer
 import csv
-import requests
-from pathlib import Path
+from configparser import ConfigParser
 from os import PathLike
-from langchain_ollama import OllamaEmbeddings
+from pathlib import Path
+
+import requests
+import typer
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from utils import get_handler, get_file_metadata
-from configparser import ConfigParser
+from langchain_ollama import OllamaEmbeddings
+
+from utils import get_file_metadata, get_handler
 
 REPOSITORY_API_URL = "https://repository.kaust.edu.sa/server/api/"
+
 
 def get_files(results: list[Document]) -> list[str]:
     """Return different files in the results from query in the vector store"""
 
-    sources = [result.metadata['source'] for result in results]
+    sources = [result.metadata["source"] for result in results]
     return list(dict.fromkeys(sources))
+
 
 def get_source_info(filename: str, metadata_path: str) -> dict | None:
     """Look up source information for a file in the CSV.
@@ -28,6 +32,7 @@ def get_source_info(filename: str, metadata_path: str) -> dict | None:
     info = get_file_metadata(filename, metadata_path)
 
     return info
+
 
 def get_item_metadata(handle: str) -> dict:
     """
@@ -48,34 +53,71 @@ def get_item_metadata(handle: str) -> dict:
 
     return response.json()
 
+
 def save_results_csv(
     results: list[dict],
     output_file: str | PathLike[str] = "results.csv",
-    ) -> None:
-
-    fieldnames = ["source", "author", "title", "abstract"]
+) -> None:
+    fieldnames = ["handle", "title", "author", "type", "section", "abstract"]
     output_path = Path(output_file)
 
-    with open(output_path, mode='w', encoding='utf-8', newline='') as csvfile:
+    with open(output_path, mode="w", encoding="utf-8", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(results)
 
 
-def main(query: str):
+def search(query: str, embeddings, vector_store, config: ConfigParser) -> list[dict]:
+    query_embeddings = embeddings.embed_query(query)
+    kk = int(config["query"]["k"])
+    fetch_k = int(config["query"]["fetch_k"])
+    metadata_path = config["paths"]["metadata"]
 
+    results = vector_store.max_marginal_relevance_search_by_vector(
+        query_embeddings, k=kk, fetch_k=fetch_k
+    )
+
+    sources = get_files(results)
+
+    items = []
+    for source in sources:
+        source_path = Path(source)
+        source_info = get_source_info(source_path.name, metadata_path)
+        if not source_info:
+            continue
+        handler = get_handler(source_info["Handle"])
+        item = get_item_metadata(handler)
+        abstract_raw = item["metadata"]["dc.description.abstract"][0]["value"]
+        abstract = abstract_raw.replace("\n", " ")
+        matching_chunk = next(
+            (r for r in results if r.metadata["source"] == source), None
+        )
+        section = matching_chunk.metadata.get("section", "") if matching_chunk else ""
+        items.append(
+            {
+                "handle": source_info["Handle"],
+                "title": source_info["Title"],
+                "author": source_info["Author"],
+                "type": source_info["Type"],
+                "section": section,
+                "abstract": abstract,
+            }
+        )
+
+    return items
+
+
+def main(query: str):
     config = ConfigParser()
     config.read(Path(__file__).parent / "config.ini")
 
-    #vector_store_db = Path("/data") / "ETD_rag" / "md_db" / "etd_rag.db"
-
     embed_model = config["embeddings"]["model"]
     embeddings = OllamaEmbeddings(model=embed_model)
-    
+
     # Initialize parameters from config file.
     collection = config["chromadb"]["collection"]
     host = config["chromadb"]["host"]
-    port = config["chromadb"]["port"]
+    port = int(config["chromadb"]["port"])
 
     # Initialize the vector store.
     vector_store = Chroma(
@@ -85,47 +127,9 @@ def main(query: str):
         port=port,
     )
 
-    query_embeddings = embeddings.embed_query(query)
-
-    # Using large `k` and `fetch_k` so we can deduplicate the entries. There 
-    # are many chunck per document.
-    # Using MMR 
-    kk = int(config["query"]["k"])
-    fetch_k = int(config["query"]["fetch_k"])
-
-    results = vector_store.max_marginal_relevance_search_by_vector(query_embeddings, k=kk, fetch_k=fetch_k)
-
-    # Deduplication.
-    print(f"Number of results: {len(results)}")
-    sources = get_files(results)
-
-    # Set (read) metadata file
-    metadata_path = config["paths"]["metadata"]
-
-    # Initialize path to results file.
-    output = f'{config["paths"]["output_dir"]}/results.csv'
-
-    rows = []
-    for source in sources:
-        source_path = Path(source)
-        #print(f"mg: results metadata source: {results[rr].metadata['source']}")
-        #print(f"mg: results page content: {results[rr].page_content[:30]}")
-
-        source_info = get_source_info(source_path.name, metadata_path)
-        handler = get_handler(source_info['Handle'])
-        item = get_item_metadata(handler)
-        abstract_raw = item["metadata"]["dc.description.abstract"][0]["value"]
-        abstract = abstract_raw.replace('\n',' ')
-        #print(f"{source_path}, {source_info['Author']}, {source_info['Title']}")
-        print(f"Saving {source_path} to csv file")
-        rows.append({
-            "source": str(source_path),
-            "author": source_info['Author'],
-            "title": source_info['Title'],
-            "abstract": abstract,
-        })
-
-    save_results_csv(rows, output)
+    results = search(query, embeddings, vector_store, config)
+    output = f"{config['paths']['output_dir']}/results.csv"
+    save_results_csv(results, output)
     print("Have a nice day!")
 
 
