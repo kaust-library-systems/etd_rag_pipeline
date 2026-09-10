@@ -1,91 +1,51 @@
-# Test querying the database.
+# Experimental chat interface over the ETD vector store (etd_pillars collection).
 # Marcelo Garcia
 
-import csv
+from configparser import ConfigParser
 from pathlib import Path
-from os import PathLike
-from langchain_ollama import OllamaEmbeddings, ChatOllama
-from langchain_core.prompts import ChatPromptTemplate
+
 from langchain_chroma import Chroma
-import chromadb
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_ollama import ChatOllama, OllamaEmbeddings
 
-
-def get_file_metadata(
-    filename: str,
-    metadata_file: str | PathLike[str] = "metadata.csv",
-) -> dict | None:
-    """Look up metadata for a file in the CSV.
-
-    Args:
-        filename: The filename to search for in the 'File' column.
-        metadata_file: Path to the CSV file.
-
-    Returns:
-        Dictionary with the file's metadata, or None if not found.
-    """
-    metadata_path = Path(metadata_file)
-
-    if not metadata_path.exists():
-        raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
-
-    with open(metadata_path, encoding="utf-8", newline="") as csvfile:
-        reader = csv.DictReader(csvfile)
-
-        for row in reader:
-            if row["File"] == filename:
-                return dict(row)
-
-    return None
-
-
-def get_source_info(filename: str) -> dict | None:
-    """Look up source information for a file in the CSV.
-    Args: filename: The filename to search for in the 'File' column.
-    """
-
-    metadata_path = Path("/data") / "ETD_rag" / "metadata.csv"
-    info = get_file_metadata(filename, metadata_path)
-
-    return info
+CHAT_MODEL = "granite3.1-dense:8b"
 
 
 def main():
-    vector_store_db = Path("/data") / "ETD_rag" / "etd_rag.db"
+    config = ConfigParser()
+    config.read(Path(__file__).parent / "config.ini")
 
-    embed_model = "granite-embedding:30m"
-    embeddings = OllamaEmbeddings(model=embed_model)
-
-    client = chromadb.PersistentClient(path=str(vector_store_db))
-    collection = client.get_collection("ETD")
-    
-    question_user = "Which documents discuss  investigates first-order mean-field game"
+    embeddings = OllamaEmbeddings(model=config["embeddings"]["model"])
 
     vector_store = Chroma(
-        client=client,
-        collection_name="ETD",
+        collection_name=config["chromadb"]["collection"],
         embedding_function=embeddings,
+        host=config["chromadb"]["host"],
+        port=int(config["chromadb"]["port"]),
     )
 
-    retriever = vector_store.as_retriever(search_kwargs={"k": 2})
-    docs = retriever.invoke(question_user )
+    question_user = "Which documents investigate first-order mean-field games?"
 
-    prompt = ChatPromptTemplate.from_template("""Answer the question based on the following context: {context}
+    retriever = vector_store.as_retriever(search_kwargs={"k": 4})
+    docs = retriever.invoke(question_user)
+
+    prompt = ChatPromptTemplate.from_template(
+        """Answer the question based on the following context: {context}
 
     Question: {question}
-    """)
+    """
+    )
 
     llm = ChatOllama(
-        model="granite3.1-dense:8b",
+        model=CHAT_MODEL,
         temperature=0,
         validate_model_on_init=True,
     )
 
     chain = prompt | llm
-    answer = chain.invoke(
-        {"context": docs, "question": question_user}
-    )
+    answer = chain.invoke({"context": docs, "question": question_user})
 
-    print(f"The answer was {answer}")
+    print(answer.content)
 
 
 if __name__ == "__main__":

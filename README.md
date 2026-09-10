@@ -4,23 +4,35 @@ A semantic search system for the KAUST Electronic Theses and Dissertations (ETD)
 
 ## Overview
 
-The pipeline ingests Markdown versions of theses into a vector store and exposes a query interface that returns ranked results with author, title, and abstract. The system runs entirely on-premise using [Ollama](https://ollama.com) for embeddings and [ChromaDB](https://www.trychroma.com) as the vector store.
+The pipeline queries a ChromaDB vector store of thesis chunks (the `etd_pillars`
+collection) and returns ranked results with author, title, matching section, and
+an abstract fetched live from the KAUST repository API. The system runs entirely
+on-premise using [Ollama](https://ollama.com) for embeddings and
+[ChromaDB](https://www.trychroma.com) (client-server) as the vector store.
+
+The `etd_pillars` collection is built and maintained by a separate ingestion
+project. Every chunk carries full bibliographic metadata (`title`, `author`,
+`advisor`, `year`, `handle`, `type`, `department`, `discipline`, `degree_name`,
+`section`), so the query side needs no external metadata file.
 
 ## Current Capabilities
 
-- Ingest Markdown files into a persistent ChromaDB vector store
-- Filter out Arabic-language sections during ingestion to reduce noise
 - Query the vector store using Maximum Marginal Relevance (MMR) search
-- Save query results to CSV with author, title, and abstract fetched live from the KAUST repository API
-- Incremental indexing — re-running ingestion only processes new or changed files
+- Deduplicate chunk hits down to distinct documents, keeping the best-ranked hit
+- Save query results to CSV, or browse them in a Streamlit web app
+- Abstracts fetched live from the KAUST repository API by handle
+- `ingest.py` retained for the legacy Markdown ingestion path (incremental,
+  Arabic-section filtering)
 
 ## Repository Structure
 
 ```
-ingest.py       — ingestion pipeline
-query.py        — query interface (CLI)
+app.py          — Streamlit web interface
+query.py        — query interface (CLI) and the shared `search()` function
 chat_etd.py     — experimental chat interface
-utils.py        — shared utilities
+ingest.py       — legacy Markdown ingestion pipeline
+utils.py        — shared utilities (used by ingest.py)
+config.ini      — paths, ChromaDB host/port/collection, embedding model, k/fetch_k
 ```
 
 ## Setup
@@ -45,7 +57,21 @@ uv sync
 ollama pull granite-embedding:30m
 ```
 
-## Ingestion
+## Web app
+
+```bash
+streamlit run app.py
+```
+
+A search box with example queries; results show title (linked to the KAUST
+repository), author, type, year, department, matching section, and abstract, with
+a CSV export button.
+
+## Ingestion (legacy Markdown path)
+
+> The current `etd_pillars` collection is produced by a separate project. The
+> script below documents the original in-repo Markdown pipeline and is kept for
+> reference.
 
 Run the ingestion script to index Markdown files into the vector store:
 
@@ -58,7 +84,8 @@ python ingest.py
 Each Markdown file is processed in two stages:
 
 1. **Header splitting** — the document is split on Markdown headers (`#`, `##`, `###`) using `MarkdownHeaderTextSplitter`, keeping section titles inside each chunk for better semantic context.
-2. **Character splitting** — oversized sections are further split with `RecursiveCharacterTextSplitter` (`chunk_size=1500`, `chunk_overlap=300`).
+2. **Character splitting** — oversized sections are further split with `RecursiveCharacterTextSplitter` (`chunk_size=800`, `chunk_overlap=150`).
+3. **Section filtering** — non-content sections (references, acknowledgements, table of contents, copyright) are dropped.
 
 This structure-aware approach produces semantically coherent chunks (e.g. abstract, introduction, methodology as separate units) rather than arbitrary character-count splits.
 
@@ -70,85 +97,87 @@ Before indexing, each chunk is scanned for Arabic characters. Chunks where more 
 
 The system uses `granite-embedding:30m` via Ollama. During development, `granite-embedding:278m` was also tested. The larger model did not produce measurably better results on the benchmark query set and was not adopted.
 
-### Vector store stats (current collection)
+### Vector store stats (`etd_pillars` collection)
 
-- **Documents:** 107 Markdown files
-- **Total chunks:** ~16,000
-- **Average chunks per document:** ~150
+- **Total chunks:** ~1.24 million
+- **Documents:** order of 5,000 theses/dissertations
+- **Average chunks per document:** ~220
+- **Embedding dimension:** 384 (`granite-embedding:30m`), l2 distance
 
-### Paths (currently hard-coded, see roadmap)
+## Configuration
 
-| Path | Purpose |
-|------|---------|
-| `/data/ETD_rag/markdown/` | Input Markdown files |
-| `/data/ETD_rag/md_db/etd_rag.db` | ChromaDB vector store |
-| `/data/ETD_rag/md_db/record_manager.db` | Incremental index record manager |
-| `/data/ETD_rag/metadata.csv` | Thesis metadata (author, title, handle) |
+All runtime settings live in `config.ini`:
+
+```ini
+[chromadb]
+host = localhost
+port = 8000
+collection = etd_pillars
+
+[embeddings]
+model = granite-embedding:30m
+
+[query]
+k = 30
+fetch_k = 500
+```
 
 ## Querying
 
 ```bash
 python query.py "water treatment membranes"
-python query.py "water treatment membranes" --k 30 --fetch-k 500 --output results.csv
 ```
+
+Results are written to `<output_dir>/results.csv`. `k` and `fetch_k` come from
+`config.ini`.
 
 ### Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `k` | 50 | Number of final results to return |
-| `fetch_k` | 170 | Number of candidate chunks to consider before MMR re-ranking |
+| `k` | 30 | Number of final chunk hits to return (deduplicated to distinct documents) |
+| `fetch_k` | 500 | Number of candidate chunks to consider before MMR re-ranking |
 
 ### Choosing k and fetch_k
 
-With ~150 chunks per document, a `fetch_k` of 170 only covers 1–2 documents before re-ranking — too narrow for a broad query. Testing showed that `fetch_k=500` improves recall and reduces false positives for broad queries. Recommended defaults are `k=30`, `fetch_k=500`.
+With ~220 chunks per document, `fetch_k` needs to be well above a single
+document's chunk count for a broad query to reach several distinct theses.
+`k=30`, `fetch_k=500` is the current default; revisit against a benchmark query
+set as the collection grows.
 
 ### Output
 
-Results are saved to a CSV file with the following fields:
-
-| Field | Description |
-|-------|-------------|
-| `source` | Path to the Markdown file |
-| `author` | Thesis author |
-| `title` | Thesis title |
-| `abstract` | Full abstract fetched live from the KAUST repository API |
+CSV fields: `handle`, `url`, `title`, `author`, `type`, `year`, `advisor`,
+`department`, `section` (matching chunk heading), `abstract` (fetched live from
+the KAUST repository API).
 
 ## ChromaDB
 
-The vector store is a persistent ChromaDB instance stored on disk. It can also be browsed via the ChromaDB CLI.
+The vector store runs as a ChromaDB server. `query.py` and `app.py` connect to it
+over HTTP using the host/port in `config.ini`.
 
-### Browse the vector store locally
-
-Start the ChromaDB server:
-
-```bash
-chroma run --path /data/ETD_rag/md_db/etd_rag.db
-```
-
-Browse in another terminal:
+### Browse the collection
 
 ```bash
-chroma browse "ETD" --local
+chroma browse "etd_pillars" --host http://localhost:8000
 ```
 
-### Using Docker
+### Run the server with Docker Compose
 
 ```bash
-docker pull chromadb/chroma:1.5.7
-docker run -v /data/ETD_rag/etd_rag.db:/data -p 8000:8000 chromadb/chroma:1.5.7
-chroma browse "ETD" --host http://localhost:8000
+docker compose up -d chromadb
 ```
+
+This serves the `etd_pillars` database (see `docker-compose.yml` for the mounted
+path).
 
 ## Roadmap
 
 ### Near term
 
-- **Configuration file** — replace hard-coded paths with a `ConfigParser` `.ini` file shared between `ingest.py` and `query.py`
-- **Streamlit web interface** — single-page application with a search box, example queries, and ranked results displayed in the browser
-- **Clickable repository links** — generate a direct URL to each thesis in the KAUST repository from the handle stored in metadata
 - **Export formats** — add JSON and HTML export options alongside CSV
 - **Query expansion** — use an LLM to rewrite or expand the user's query before searching, available as an opt-in toggle
+- **Parameter tuning** — re-evaluate `k` / `fetch_k` against a benchmark query set at the full collection scale
 
 ### Future considerations
 

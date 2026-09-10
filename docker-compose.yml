@@ -5,7 +5,7 @@ services:
     environment:
       - IS_PERSISTENT=TRUE
     volumes:
-      - /data/ETD_rag/etd_rag.db:/data
+      - /data/databases/etd_pillars/etd_pillars_db/etd_pillars.db:/data
     ports:
       - "8000:8000"
     restart: unless-stopped

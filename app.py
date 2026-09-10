@@ -3,15 +3,11 @@ import io
 from configparser import ConfigParser
 from pathlib import Path
 
-import requests
 import streamlit as st
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 
 from query import search
-from utils import get_handler
-
-REPOSITORY_API_URL = "https://repository.kaust.edu.sa/server/api/"
 
 EXAMPLES = [
     "Numerical methods for fluid dynamics simulation",
@@ -37,23 +33,6 @@ def load_resources():
     return embeddings, vector_store
 
 
-def fetch_abstract(handle_url: str) -> str:
-    try:
-        handler = get_handler(handle_url)
-        response = requests.get(
-            f"{REPOSITORY_API_URL}pid/find",
-            params={"id": handler},
-            headers={"Accept": "application/json"},
-            timeout=30,
-        )
-        response.raise_for_status()
-        item = response.json()
-        abstract_raw = item["metadata"]["dc.description.abstract"][0]["value"]
-        return abstract_raw.replace("\n", " ")
-    except Exception:
-        return "Abstract not available."
-
-
 @st.cache_data
 def run_search(query: str) -> list[dict]:
     embeddings, vector_store = load_resources()
@@ -63,7 +42,18 @@ def run_search(query: str) -> list[dict]:
 
 def results_to_csv(results: list[dict]) -> str:
     output = io.StringIO()
-    fieldnames = ["title", "author", "type", "handle", "section", "abstract"]
+    fieldnames = [
+        "handle",
+        "url",
+        "title",
+        "author",
+        "type",
+        "year",
+        "advisor",
+        "department",
+        "section",
+        "abstract",
+    ]
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(results)
@@ -110,10 +100,13 @@ if query:
 
         for item in results:
             with st.container():
-                st.markdown(f"#### [{item['title']}]({item['handle']})")
-                col1, col2 = st.columns(2)
+                st.markdown(f"#### [{item['title']}]({item['url']})")
+                col1, col2, col3 = st.columns(3)
                 col1.markdown(f"**Author:** {item['author']}")
                 col2.markdown(f"**Type:** {item['type']}")
+                col3.markdown(f"**Year:** {item['year']}")
+                if item["department"]:
+                    st.markdown(f"**Department:** {item['department']}")
                 if item["section"]:
                     st.markdown(f"**Matching section:** {item['section']}")
                 with st.expander("Abstract"):
