@@ -102,6 +102,8 @@ def search(query: str, embeddings, vector_store, config: ConfigParser) -> list[d
                 "year": meta.get("year", ""),
                 "advisor": meta.get("advisor", ""),
                 "department": meta.get("department", ""),
+                "journal": meta.get("journal", ""),
+                "doi": meta.get("doi", ""),
                 "section": meta.get("section") or "",
                 "abstract": get_abstract(handle),
             }

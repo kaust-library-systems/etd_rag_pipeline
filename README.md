@@ -63,9 +63,16 @@ ollama pull granite-embedding:30m
 streamlit run app.py
 ```
 
-A search box with example queries; results show title (linked to the KAUST
-repository), author, type, year, department, matching section, and abstract, with
-a CSV export button.
+A selector at the top picks the collection to search: **Theses** (`etd_pillars`) or
+**Articles** (`publications`, the article full text ingested by
+`../ResearchOutput/artices_csv_pilars`). Both live on the same Chroma server. The
+choices come from the `[collections]` section of `config.ini`.
+
+A search box with example queries (different per collection); results show title
+(linked to the KAUST repository), author, type, year, department, matching section,
+and abstract, plus advisor for theses and journal and DOI for articles. Long article
+author lists are cut to the first three. A CSV export button saves the results
+(`etd_results.csv` or `article_results.csv`).
 
 ## Ingestion (legacy Markdown path)
 
@@ -113,6 +120,11 @@ All runtime settings live in `config.ini`:
 host = localhost
 port = 8000
 collection = etd_pillars
+
+# Collections the web app (app.py) can search: label = collection name.
+[collections]
+Theses = etd_pillars
+Articles = publications
 
 [embeddings]
 model = granite-embedding:30m
