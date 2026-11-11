@@ -15,9 +15,9 @@ from langchain_ollama import OllamaEmbeddings
 REPOSITORY_API_URL = "https://repository.kaust.edu.sa/server/api/"
 HANDLE_URL = "https://hdl.handle.net/"
 # Atmire's bot-blocking rules on the hosted repository answer 403 to the
-# generic "python-requests/x.y" user agent; Atmire asks clients to send a
-# user agent that identifies the integration instead.
-USER_AGENT = "etd_rag_pipeline/0.1"
+# generic "python-requests/x.y" user agent. This is the User-Agent agreed with
+# Atmire (same as repo_export, repo_export#12).
+USER_AGENT = "Robot-of-kaust"
 
 
 def get_item_metadata(handle: str) -> dict:
