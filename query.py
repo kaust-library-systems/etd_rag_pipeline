@@ -14,6 +14,10 @@ from langchain_ollama import OllamaEmbeddings
 
 REPOSITORY_API_URL = "https://repository.kaust.edu.sa/server/api/"
 HANDLE_URL = "https://hdl.handle.net/"
+# Atmire's bot-blocking rules on the hosted repository answer 403 to the
+# generic "python-requests/x.y" user agent; Atmire asks clients to send a
+# user agent that identifies the integration instead.
+USER_AGENT = "etd_rag_pipeline/0.1"
 
 
 def get_item_metadata(handle: str) -> dict:
@@ -28,7 +32,7 @@ def get_item_metadata(handle: str) -> dict:
     response = requests.get(
         f"{REPOSITORY_API_URL}pid/find",
         params={"id": handle},
-        headers={"Accept": "application/json"},
+        headers={"Accept": "application/json", "User-Agent": USER_AGENT},
         timeout=30,
     )
     response.raise_for_status()
