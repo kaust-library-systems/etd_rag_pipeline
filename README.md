@@ -65,7 +65,7 @@ streamlit run app.py
 
 A selector at the top picks the collection to search: **Theses** (`etd_pillars`) or
 **Articles** (`publications`, the article full text ingested by
-`../ResearchOutput/artices_csv_pilars`). Both live on the same Chroma server. The
+`../ResearchOutput/articles_csv_pilars`). Both live on the same Chroma server. The
 choices come from the `[collections]` section of `config.ini`.
 
 A search box with example queries (different per collection); results show title
